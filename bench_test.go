@@ -1,6 +1,7 @@
 package benchmarks
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,13 +13,10 @@ import (
 
 var dummyHandler = http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {})
 
-var reqHeaders = []string{"Accept", "Content-Type", "X-Requested-With"}
-
-var otherOrigins = []string{
-	"https://example.com",
-	"https://*.example.com",
-	"https://google.com",
-	"https://*.google.com",
+var reqHeaders = []string{
+	"Accept",
+	"Content-Type",
+	"X-Requested-With",
 }
 
 type Middleware = func(http.Handler) http.Handler
@@ -72,6 +70,18 @@ func BenchmarkAll(b *testing.B) {
 				},
 			),
 		}, {
+			name: "rs_cors ridiculously many origins vs actual request",
+			mw: cors.New(cors.Options{
+				AllowedOrigins: append(manyOrigins, dummyOrigin),
+				AllowedHeaders: reqHeaders,
+			}).Handler,
+			req: newRequest(
+				http.MethodGet,
+				http.Header{
+					headerOrigin: {dummyOrigin},
+				},
+			),
+		}, {
 			name: "rs_cors any origin vs actual request",
 			mw: cors.New(cors.Options{
 				AllowedOrigins: []string{"*"},
@@ -100,6 +110,19 @@ func BenchmarkAll(b *testing.B) {
 			name: "rs_cors multiple origins vs preflight request",
 			mw: cors.New(cors.Options{
 				AllowedOrigins: append(otherOrigins, dummyOrigin),
+				AllowedHeaders: reqHeaders,
+			}).Handler,
+			req: newRequest(
+				http.MethodOptions,
+				http.Header{
+					headerOrigin: {dummyOrigin},
+					headerACRM:   {http.MethodGet},
+				},
+			),
+		}, {
+			name: "rs_cors ridiculously many origins vs preflight request",
+			mw: cors.New(cors.Options{
+				AllowedOrigins: append(manyOrigins, dummyOrigin),
 				AllowedHeaders: reqHeaders,
 			}).Handler,
 			req: newRequest(
@@ -161,6 +184,18 @@ func BenchmarkAll(b *testing.B) {
 				},
 			),
 		}, {
+			name: "jub0bs_fcors ridiculously many origins vs actual request",
+			mw: mustAllowAccess(
+				fcors.FromOrigins(dummyOrigin, manyOrigins...),
+				withRequestHeaders(reqHeaders...),
+			),
+			req: newRequest(
+				http.MethodGet,
+				http.Header{
+					headerOrigin: {dummyOrigin},
+				},
+			),
+		}, {
 			name: "jub0bs_fcors any origin vs actual request",
 			mw: mustAllowAccess(
 				fcors.FromAnyOrigin(),
@@ -189,6 +224,19 @@ func BenchmarkAll(b *testing.B) {
 			name: "jub0bs_fcors multiple origins vs preflight request",
 			mw: mustAllowAccess(
 				fcors.FromOrigins(dummyOrigin, otherOrigins...),
+				withRequestHeaders(reqHeaders...),
+			),
+			req: newRequest(
+				http.MethodOptions,
+				http.Header{
+					headerOrigin: {dummyOrigin},
+					headerACRM:   {http.MethodGet},
+				},
+			),
+		}, {
+			name: "jub0bs_fcors ridiculously many origins vs preflight request",
+			mw: mustAllowAccess(
+				fcors.FromOrigins(dummyOrigin, manyOrigins...),
 				withRequestHeaders(reqHeaders...),
 			),
 			req: newRequest(
@@ -269,5 +317,43 @@ func identity[T any](t T) T { return t }
 func clear(h http.Header) {
 	for k := range h {
 		delete(h, k)
+	}
+}
+
+var otherOrigins = []string{
+	"https://example.com",
+	"https://*.example.com",
+	"https://google.com",
+	"https://*.google.com",
+}
+
+var manyOrigins []string
+
+func init() {
+	const n = 100
+	for i := 0; i < n; i++ {
+		manyOrigins = append(
+			manyOrigins,
+			// https
+			fmt.Sprintf("https://example%d.com", i),
+			fmt.Sprintf("https://example%d.com:7070", i),
+			fmt.Sprintf("https://example%d.com:8080", i),
+			fmt.Sprintf("https://example%d.com:9090", i),
+			// one subdomain deep
+			fmt.Sprintf("https://foo.example%d.com", i),
+			fmt.Sprintf("https://foo.example%d.com:6060", i),
+			fmt.Sprintf("https://foo.example%d.com:7070", i),
+			fmt.Sprintf("https://foo.example%d.com:9090", i),
+			// two subdomains deep
+			fmt.Sprintf("https://foo.bar.example%d.com", i),
+			fmt.Sprintf("https://foo.bar.example%d.com:6060", i),
+			fmt.Sprintf("https://foo.bar.example%d.com:7070", i),
+			fmt.Sprintf("https://foo.bar.example%d.com:9090", i),
+			// arbitrary subdomains
+			fmt.Sprintf("https://*.foo.bar.example%d.com", i),
+			fmt.Sprintf("https://*.foo.bar.example%d.com:6060", i),
+			fmt.Sprintf("https://*.foo.bar.example%d.com:7070", i),
+			fmt.Sprintf("https://*.foo.bar.example%d.com:9090", i),
+		)
 	}
 }
