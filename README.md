@@ -33,34 +33,34 @@ cpu: Intel(R) Core(TM) i7-6700HQ CPU @ 2.60GHz
 without_CORS      205514234        6 ns/op       0 B/op      0 allocs/op
 ```
 
-### rs/cors
+### rs/cors (v1.10.0)
 
 ```text
-single_origin____vs_actual                   3194002      375 ns/op      48 B/op      3 allocs/op
-multiple_origins_vs_actual                   3152779      382 ns/op      48 B/op      3 allocs/op
-pathological_____vs_actual                   1742828      680 ns/op      48 B/op      3 allocs/op
-many_origins_____vs_actual                   1246867     1026 ns/op      48 B/op      3 allocs/op
-any_origin_______vs_actual                   3499288      342 ns/op      48 B/op      3 allocs/op
-single_origin____vs_preflight                1223632      983 ns/op     160 B/op      6 allocs/op
-multiple_origins_vs_preflight                1214544      986 ns/op     160 B/op      6 allocs/op
-pathological_____vs_preflight                1237032     1019 ns/op     144 B/op      5 allocs/op
-many_origins_____vs_preflight                 765120     1574 ns/op     160 B/op      6 allocs/op
-any_origin_______vs_preflight                1264927      951 ns/op     160 B/op      6 allocs/op
-any_origin_______vs_preflight_one_header      907146     1302 ns/op     208 B/op     10 allocs/op
+single_origin____vs_actual                   7139101      168 ns/op       0 B/op      0 allocs/op
+multiple_origins_vs_actual                   6878386      173 ns/op       0 B/op      0 allocs/op
+pathological_____vs_actual                   1946841      613 ns/op      32 B/op      2 allocs/op
+many_origins_____vs_actual                   1828209      654 ns/op       0 B/op      0 allocs/op
+any_origin_______vs_actual                   9203700      129 ns/op       0 B/op      0 allocs/op
+single_origin____vs_preflight                3326931      360 ns/op       0 B/op      0 allocs/op
+multiple_origins_vs_preflight                3280380      369 ns/op       0 B/op      0 allocs/op
+pathological_____vs_preflight                1668750      703 ns/op      32 B/op      2 allocs/op
+many_origins_____vs_preflight                1414594      850 ns/op       0 B/op      0 allocs/op
+any_origin_______vs_preflight                3726684      334 ns/op       0 B/op      0 allocs/op
+any_origin_______vs_preflight_one_header     3103416      380 ns/op       0 B/op      0 allocs/op
 ```
 
-### jub0bs/fcors
+### jub0bs/fcors (v0.6.0)
 
 ```text
-single_origin____vs_actual                  21439983       53 ns/op       0 B/op      0 allocs/op
-multiple_origins_vs_actual                   6499868      184 ns/op       0 B/op      0 allocs/op
-many_origins_____vs_actual                   5030031      216 ns/op       0 B/op      0 allocs/op
-pathological_____vs_actual                    422941     2826 ns/op       0 B/op      0 allocs/op
-any_origin_______vs_actual                  21453963       53 ns/op       0 B/op      0 allocs/op
-single_origin____vs_preflight                7923229      152 ns/op       0 B/op      0 allocs/op
-multiple_origins_vs_preflight                4998284      222 ns/op       0 B/op      0 allocs/op
-pathological_____vs_preflight                 417468     2823 ns/op       0 B/op      0 allocs/op
-many_origins_vs_preflight                    4601485      259 ns/op       0 B/op      0 allocs/op
-any_origin_______vs_preflight                8044881      149 ns/op       0 B/op      0 allocs/op
-any_origin_______vs_preflight_one_header     7042791      171 ns/op       0 B/op      0 allocs/op
+pathological_____vs_actual                  19591662       61 ns/op       0 B/op      0 allocs/op
+multiple_origins_vs_actual                   5750486      201 ns/op       0 B/op      0 allocs/op
+pathological_____vs_actual                    378091     3223 ns/op       0 B/op      0 allocs/op
+many_origins_____vs_actual                   5524437      215 ns/op       0 B/op      0 allocs/op
+any_origin_______vs_actual                  19334355       62 ns/op       0 B/op      0 allocs/op
+single_origin____vs_preflight                6386853      173 ns/op       0 B/op      0 allocs/op
+multiple_origins_vs_preflight                4372368      242 ns/op       0 B/op      0 allocs/op
+pathological_____vs_preflight                 377569     3311 ns/op       0 B/op      0 allocs/op
+many_origins_____vs_preflight                4686819      254 ns/op       0 B/op      0 allocs/op
+any_origin_______vs_preflight                7188351      167 ns/op       0 B/op      0 allocs/op
+any_origin_______vs_preflight_one_header     6407846      186 ns/op       0 B/op      0 allocs/op
 ```
