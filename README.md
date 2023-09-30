@@ -52,7 +52,7 @@ any_origin_______vs_preflight_one_header     3103416      380 ns/op       0 B/op
 ### jub0bs/fcors (v0.6.0)
 
 ```text
-pathological_____vs_actual                  19591662       61 ns/op       0 B/op      0 allocs/op
+single_origin____vs_actual                  19591662       61 ns/op       0 B/op      0 allocs/op
 multiple_origins_vs_actual                   5750486      201 ns/op       0 B/op      0 allocs/op
 pathological_____vs_actual                    378091     3223 ns/op       0 B/op      0 allocs/op
 many_origins_____vs_actual                   5524437      215 ns/op       0 B/op      0 allocs/op
