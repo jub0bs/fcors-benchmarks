@@ -7,9 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rs/cors"
-
 	"github.com/jub0bs/fcors"
+	"github.com/rs/cors"
 )
 
 const hostMaxLen = 253
@@ -22,26 +21,40 @@ var reqHeaders = []string{
 	"X-Requested-With",
 }
 
-type Middleware = func(http.Handler) http.Handler
-
 const (
 	headerOrigin = "Origin"
 	headerACRM   = "Access-Control-Request-Method"
 	headerACRH   = "Access-Control-Request-Headers"
 )
 
+const (
+	rsCors      = "rs_cors"
+	jub0bsFcors = "jub0bs_fcors"
+)
+
 const dummyOrigin = "https://jub0bs.com"
 
+type Middleware struct {
+	wrap func(http.Handler) http.Handler
+	name string
+}
+
+type Case2 struct {
+	middleware []Middleware
+	desc       string
+	req        *http.Request
+}
+
 func BenchmarkAll(b *testing.B) {
-	type Case struct {
-		name string
-		mw   Middleware
-		req  *http.Request
-	}
-	cases := []Case{
+	cases := []Case2{
 		{
-			name: "without CORS_________________vs_actual",
-			mw:   identity[http.Handler],
+			middleware: []Middleware{
+				{
+					wrap: identity[http.Handler],
+					name: "identity",
+				},
+			},
+			desc: "vs_actual",
 			req: newRequest(
 				http.MethodGet,
 				http.Header{
@@ -49,11 +62,46 @@ func BenchmarkAll(b *testing.B) {
 				},
 			),
 		}, {
-			name: "rs_cors_______________single_vs_actual",
-			mw: cors.New(cors.Options{
-				AllowedOrigins: []string{dummyOrigin},
-				AllowedHeaders: reqHeaders,
-			}).Handler,
+			middleware: []Middleware{
+				{
+					wrap: cors.New(cors.Options{
+						AllowedOrigins: []string{dummyOrigin},
+						AllowedHeaders: reqHeaders,
+					}).Handler,
+					name: rsCors,
+				}, {
+					wrap: mustAllowAccess(
+						fcors.FromOrigins(dummyOrigin),
+						withRequestHeaders(reqHeaders...),
+					),
+					name: jub0bsFcors,
+				},
+			},
+			desc: "single_vs_actual",
+			req: newRequest(
+				http.MethodGet,
+				http.Header{
+					headerOrigin: {dummyOrigin},
+				},
+			),
+		},
+		{
+			middleware: []Middleware{
+				{
+					wrap: cors.New(cors.Options{
+						AllowedOrigins: append(otherOrigins, dummyOrigin),
+						AllowedHeaders: reqHeaders,
+					}).Handler,
+					name: rsCors,
+				}, {
+					wrap: mustAllowAccess(
+						fcors.FromOrigins(dummyOrigin, otherOrigins...),
+						withRequestHeaders(reqHeaders...),
+					),
+					name: jub0bsFcors,
+				},
+			},
+			desc: "multiple_vs_actual",
 			req: newRequest(
 				http.MethodGet,
 				http.Header{
@@ -61,50 +109,28 @@ func BenchmarkAll(b *testing.B) {
 				},
 			),
 		}, {
-			name: "jub0bs_fcors__________single_vs_actual",
-			mw: mustAllowAccess(
-				fcors.FromOrigins(dummyOrigin),
-				withRequestHeaders(reqHeaders...),
-			),
-			req: newRequest(
-				http.MethodGet,
-				http.Header{
-					headerOrigin: {dummyOrigin},
+			middleware: []Middleware{
+				{
+					wrap: cors.New(cors.Options{
+						AllowedOrigins: []string{
+							"https://a" + strings.Repeat(".a", hostMaxLen/2),
+							"https://b" + strings.Repeat(".a", hostMaxLen/2),
+						},
+						AllowedHeaders: reqHeaders,
+					}).Handler,
+					name: rsCors,
+				}, {
+					wrap: mustAllowAccess(
+						fcors.FromOrigins(
+							"https://a"+strings.Repeat(".a", hostMaxLen/2),
+							"https://b"+strings.Repeat(".a", hostMaxLen/2),
+						),
+						withRequestHeaders(reqHeaders...),
+					),
+					name: jub0bsFcors,
 				},
-			),
-		}, {
-			name: "rs_cors_____________multiple_vs_actual",
-			mw: cors.New(cors.Options{
-				AllowedOrigins: append(otherOrigins, dummyOrigin),
-				AllowedHeaders: reqHeaders,
-			}).Handler,
-			req: newRequest(
-				http.MethodGet,
-				http.Header{
-					headerOrigin: {dummyOrigin},
-				},
-			),
-		}, {
-			name: "jub0bs_fcors________multiple_vs_actual",
-			mw: mustAllowAccess(
-				fcors.FromOrigins(dummyOrigin, otherOrigins...),
-				withRequestHeaders(reqHeaders...),
-			),
-			req: newRequest(
-				http.MethodGet,
-				http.Header{
-					headerOrigin: {dummyOrigin},
-				},
-			),
-		}, {
-			name: "rs_cors_________pathological_vs_actual",
-			mw: cors.New(cors.Options{
-				AllowedOrigins: []string{
-					"https://a" + strings.Repeat(".a", hostMaxLen/2),
-					"https://b" + strings.Repeat(".a", hostMaxLen/2),
-				},
-				AllowedHeaders: reqHeaders,
-			}).Handler,
+			},
+			desc: "pathological_vs_actual",
 			req: newRequest(
 				http.MethodGet,
 				http.Header{
@@ -112,26 +138,22 @@ func BenchmarkAll(b *testing.B) {
 				},
 			),
 		}, {
-			name: "jub0bs_fcors____pathological_vs_actual",
-			mw: mustAllowAccess(
-				fcors.FromOrigins(
-					"https://a"+strings.Repeat(".a", hostMaxLen/2),
-					"https://b"+strings.Repeat(".a", hostMaxLen/2),
-				),
-				withRequestHeaders(reqHeaders...),
-			),
-			req: newRequest(
-				http.MethodGet,
-				http.Header{
-					headerOrigin: {"https://c" + strings.Repeat(".a", hostMaxLen/2)},
+			middleware: []Middleware{
+				{
+					wrap: cors.New(cors.Options{
+						AllowedOrigins: append(manyOrigins, dummyOrigin),
+						AllowedHeaders: reqHeaders,
+					}).Handler,
+					name: rsCors,
+				}, {
+					wrap: mustAllowAccess(
+						fcors.FromOrigins(dummyOrigin, manyOrigins...),
+						withRequestHeaders(reqHeaders...),
+					),
+					name: jub0bsFcors,
 				},
-			),
-		}, {
-			name: "rs_cors_________________many_vs_actual",
-			mw: cors.New(cors.Options{
-				AllowedOrigins: append(manyOrigins, dummyOrigin),
-				AllowedHeaders: reqHeaders,
-			}).Handler,
+			},
+			desc: "many_vs_actual",
 			req: newRequest(
 				http.MethodGet,
 				http.Header{
@@ -139,11 +161,22 @@ func BenchmarkAll(b *testing.B) {
 				},
 			),
 		}, {
-			name: "jub0bs_fcors____________many_vs_actual",
-			mw: mustAllowAccess(
-				fcors.FromOrigins(dummyOrigin, manyOrigins...),
-				withRequestHeaders(reqHeaders...),
-			),
+			middleware: []Middleware{
+				{
+					wrap: cors.New(cors.Options{
+						AllowedOrigins: []string{"*"},
+						AllowedHeaders: reqHeaders,
+					}).Handler,
+					name: rsCors,
+				}, {
+					wrap: mustAllowAccess(
+						fcors.FromAnyOrigin(),
+						withRequestHeaders(reqHeaders...),
+					),
+					name: jub0bsFcors,
+				},
+			},
+			desc: "any_vs_actual",
 			req: newRequest(
 				http.MethodGet,
 				http.Header{
@@ -151,35 +184,22 @@ func BenchmarkAll(b *testing.B) {
 				},
 			),
 		}, {
-			name: "rs_cors__________________any_vs_actual",
-			mw: cors.New(cors.Options{
-				AllowedOrigins: []string{"*"},
-				AllowedHeaders: reqHeaders,
-			}).Handler,
-			req: newRequest(
-				http.MethodGet,
-				http.Header{
-					headerOrigin: {dummyOrigin},
+			middleware: []Middleware{
+				{
+					wrap: cors.New(cors.Options{
+						AllowedOrigins: []string{dummyOrigin},
+						AllowedHeaders: reqHeaders,
+					}).Handler,
+					name: rsCors,
+				}, {
+					wrap: mustAllowAccess(
+						fcors.FromOrigins(dummyOrigin),
+						withRequestHeaders(reqHeaders...),
+					),
+					name: jub0bsFcors,
 				},
-			),
-		}, {
-			name: "jub0bs_fcors_____________any_vs_actual",
-			mw: mustAllowAccess(
-				fcors.FromAnyOrigin(),
-				withRequestHeaders(reqHeaders...),
-			),
-			req: newRequest(
-				http.MethodGet,
-				http.Header{
-					headerOrigin: {dummyOrigin},
-				},
-			),
-		}, {
-			name: "rs_cors____________single_vs_preflight",
-			mw: cors.New(cors.Options{
-				AllowedOrigins: []string{dummyOrigin},
-				AllowedHeaders: reqHeaders,
-			}).Handler,
+			},
+			desc: "single_vs_preflight",
 			req: newRequest(
 				http.MethodOptions,
 				http.Header{
@@ -188,11 +208,22 @@ func BenchmarkAll(b *testing.B) {
 				},
 			),
 		}, {
-			name: "jub0bs_fcors_______single_vs_preflight",
-			mw: mustAllowAccess(
-				fcors.FromOrigins(dummyOrigin),
-				withRequestHeaders(reqHeaders...),
-			),
+			middleware: []Middleware{
+				{
+					wrap: cors.New(cors.Options{
+						AllowedOrigins: append(otherOrigins, dummyOrigin),
+						AllowedHeaders: reqHeaders,
+					}).Handler,
+					name: rsCors,
+				}, {
+					wrap: mustAllowAccess(
+						fcors.FromOrigins(dummyOrigin, otherOrigins...),
+						withRequestHeaders(reqHeaders...),
+					),
+					name: jub0bsFcors,
+				},
+			},
+			desc: "multiple_vs_preflight",
 			req: newRequest(
 				http.MethodOptions,
 				http.Header{
@@ -201,56 +232,28 @@ func BenchmarkAll(b *testing.B) {
 				},
 			),
 		}, {
-			name: "rs_cors__________multiple_vs_preflight",
-			mw: cors.New(cors.Options{
-				AllowedOrigins: append(otherOrigins, dummyOrigin),
-				AllowedHeaders: reqHeaders,
-			}).Handler,
-			req: newRequest(
-				http.MethodOptions,
-				http.Header{
-					headerOrigin: {dummyOrigin},
-					headerACRM:   {http.MethodGet},
+			middleware: []Middleware{
+				{
+					wrap: cors.New(cors.Options{
+						AllowedOrigins: []string{
+							"https://a" + strings.Repeat(".a", hostMaxLen/2),
+							"https://b" + strings.Repeat(".a", hostMaxLen/2),
+						},
+						AllowedHeaders: reqHeaders,
+					}).Handler,
+					name: rsCors,
+				}, {
+					wrap: mustAllowAccess(
+						fcors.FromOrigins(
+							"https://a"+strings.Repeat(".a", hostMaxLen/2),
+							"https://b"+strings.Repeat(".a", hostMaxLen/2),
+						),
+						withRequestHeaders(reqHeaders...),
+					),
+					name: jub0bsFcors,
 				},
-			),
-		}, {
-			name: "jub0bs_fcors_____multiple_vs_preflight",
-			mw: mustAllowAccess(
-				fcors.FromOrigins(dummyOrigin, otherOrigins...),
-				withRequestHeaders(reqHeaders...),
-			),
-			req: newRequest(
-				http.MethodOptions,
-				http.Header{
-					headerOrigin: {dummyOrigin},
-					headerACRM:   {http.MethodGet},
-				},
-			),
-		}, {
-			name: "rs_cors______pathological_vs_preflight",
-			mw: cors.New(cors.Options{
-				AllowedOrigins: []string{
-					"https://a" + strings.Repeat(".a", hostMaxLen/2),
-					"https://b" + strings.Repeat(".a", hostMaxLen/2),
-				},
-				AllowedHeaders: reqHeaders,
-			}).Handler,
-			req: newRequest(
-				http.MethodOptions,
-				http.Header{
-					headerOrigin: {"https://c" + strings.Repeat(".a", hostMaxLen/2)},
-					headerACRM:   {http.MethodGet},
-				},
-			),
-		}, {
-			name: "jub0bs_fcors_pathological_vs_preflight",
-			mw: mustAllowAccess(
-				fcors.FromOrigins(
-					"https://a"+strings.Repeat(".a", hostMaxLen/2),
-					"https://b"+strings.Repeat(".a", hostMaxLen/2),
-				),
-				withRequestHeaders(reqHeaders...),
-			),
+			},
+			desc: "pathological_vs_preflight",
 			req: newRequest(
 				http.MethodOptions,
 				http.Header{
@@ -259,11 +262,22 @@ func BenchmarkAll(b *testing.B) {
 				},
 			),
 		}, {
-			name: "rs_cors______________many_vs_preflight",
-			mw: cors.New(cors.Options{
-				AllowedOrigins: append(manyOrigins, dummyOrigin),
-				AllowedHeaders: reqHeaders,
-			}).Handler,
+			middleware: []Middleware{
+				{
+					wrap: cors.New(cors.Options{
+						AllowedOrigins: append(manyOrigins, dummyOrigin),
+						AllowedHeaders: reqHeaders,
+					}).Handler,
+					name: rsCors,
+				}, {
+					wrap: mustAllowAccess(
+						fcors.FromOrigins(dummyOrigin, manyOrigins...),
+						withRequestHeaders(reqHeaders...),
+					),
+					name: jub0bsFcors,
+				},
+			},
+			desc: "many_vs_preflight",
 			req: newRequest(
 				http.MethodOptions,
 				http.Header{
@@ -272,11 +286,22 @@ func BenchmarkAll(b *testing.B) {
 				},
 			),
 		}, {
-			name: "jub0bs_fcors_________many_vs_preflight",
-			mw: mustAllowAccess(
-				fcors.FromOrigins(dummyOrigin, manyOrigins...),
-				withRequestHeaders(reqHeaders...),
-			),
+			middleware: []Middleware{
+				{
+					wrap: cors.New(cors.Options{
+						AllowedOrigins: []string{"*"},
+						AllowedHeaders: reqHeaders,
+					}).Handler,
+					name: rsCors,
+				}, {
+					wrap: mustAllowAccess(
+						fcors.FromAnyOrigin(),
+						withRequestHeaders(reqHeaders...),
+					),
+					name: jub0bsFcors,
+				},
+			},
+			desc: "any_vs_preflight",
 			req: newRequest(
 				http.MethodOptions,
 				http.Header{
@@ -285,51 +310,22 @@ func BenchmarkAll(b *testing.B) {
 				},
 			),
 		}, {
-			name: "rs_cors_______________any_vs_preflight",
-			mw: cors.New(cors.Options{
-				AllowedOrigins: []string{"*"},
-				AllowedHeaders: reqHeaders,
-			}).Handler,
-			req: newRequest(
-				http.MethodOptions,
-				http.Header{
-					headerOrigin: {dummyOrigin},
-					headerACRM:   {http.MethodGet},
+			middleware: []Middleware{
+				{
+					wrap: cors.New(cors.Options{
+						AllowedOrigins: []string{"*"},
+						AllowedHeaders: reqHeaders,
+					}).Handler,
+					name: rsCors,
+				}, {
+					wrap: mustAllowAccess(
+						fcors.FromAnyOrigin(),
+						withRequestHeaders(reqHeaders...),
+					),
+					name: jub0bsFcors,
 				},
-			),
-		}, {
-			name: "jub0bs_fcors__________any_vs_preflight",
-			mw: mustAllowAccess(
-				fcors.FromAnyOrigin(),
-				withRequestHeaders(reqHeaders...),
-			),
-			req: newRequest(
-				http.MethodOptions,
-				http.Header{
-					headerOrigin: {dummyOrigin},
-					headerACRM:   {http.MethodGet},
-				},
-			),
-		}, {
-			name: "rs_cors_______any_1header_vs_preflight",
-			mw: cors.New(cors.Options{
-				AllowedOrigins: []string{"*"},
-				AllowedHeaders: reqHeaders,
-			}).Handler,
-			req: newRequest(
-				http.MethodOptions,
-				http.Header{
-					headerOrigin: {dummyOrigin},
-					headerACRM:   {http.MethodGet},
-					headerACRH:   {"Accept"},
-				},
-			),
-		}, {
-			name: "jub0bs_fcors__any_1header_vs_preflight",
-			mw: mustAllowAccess(
-				fcors.FromAnyOrigin(),
-				withRequestHeaders(reqHeaders...),
-			),
+			},
+			desc: "any_1header_vs_preflight",
 			req: newRequest(
 				http.MethodOptions,
 				http.Header{
@@ -341,19 +337,23 @@ func BenchmarkAll(b *testing.B) {
 		},
 	}
 	for _, c := range cases {
-		handler := c.mw(dummyHandler)
-		f := func(b *testing.B) {
-			recs := make([]*httptest.ResponseRecorder, b.N)
-			for i := 0; i < b.N; i++ {
-				recs[i] = httptest.NewRecorder()
+		for _, middleware := range c.middleware {
+			handler := middleware.wrap(dummyHandler)
+			f := func(b *testing.B) {
+				recs := make([]*httptest.ResponseRecorder, b.N)
+				for i := 0; i < b.N; i++ {
+					recs[i] = httptest.NewRecorder()
+				}
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					handler.ServeHTTP(recs[i], c.req)
+				}
 			}
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				handler.ServeHTTP(recs[i], c.req)
-			}
+			const padding = 38
+			name := middleware.name + strings.Repeat("_", padding-len(middleware.name)-len(c.desc)) + c.desc
+			b.Run(name, f)
 		}
-		b.Run(c.name, f)
 	}
 }
 
