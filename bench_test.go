@@ -343,12 +343,14 @@ func BenchmarkAll(b *testing.B) {
 	for _, c := range cases {
 		handler := c.mw(dummyHandler)
 		f := func(b *testing.B) {
-			rec := httptest.NewRecorder()
+			recs := make([]*httptest.ResponseRecorder, b.N)
+			for i := 0; i < b.N; i++ {
+				recs[i] = httptest.NewRecorder()
+			}
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				clear(rec.Header())
-				handler.ServeHTTP(rec, c.req)
+				handler.ServeHTTP(recs[i], c.req)
 			}
 		}
 		b.Run(c.name, f)
@@ -378,12 +380,6 @@ func newRequest(method string, headers http.Header) *http.Request {
 }
 
 func identity[T any](t T) T { return t }
-
-func clear(h http.Header) {
-	for k := range h {
-		delete(h, k)
-	}
-}
 
 var otherOrigins = []string{
 	"https://example.com",
